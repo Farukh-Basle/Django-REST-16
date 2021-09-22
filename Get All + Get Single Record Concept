@@ -1,0 +1,272 @@
+Serialization
+==========
+Converting the object from one form into another form is called Serialization.
+
+The process of converting the QuerySets or Database instances into python native datatypes (Dict)
+and then converted into Json data type is called as "Serialization".
+
+
+
+
+Q) How many ways we will perform serialization ?
+===============  ============    =============
+
+Three ways are available ,
+     1) By using python in-built module  "json" .
+              json.dumps(data)
+
+     2) By using django's serialize() function.
+              from django.core.serializers import serialize --->> method.
+ 
+     3) By using rest_framework serializers  module
+               from   rest_framework   import   serializers 
+
+
+
+
+Here iam not going to tell rest_framework serializers concept right now. After installing DRF then we will discuss about it cleraly.
+
+We will discuss now by using Django "serializers" module only. Means manually we are handling the conversion of code .
+
+
+Q) What is concept of djangos Serialization ?
+
+----> "serializers" is a djangos in-built module.
+
+---> serializers module contain one method that is called serialize().
+
+----> By using serialize() , we can convert queryset obj into json very easy.
+
+
+for this what we have to write logic as ,
+               json_data = serializers.serialize('json' , qs)
+
+
+
+here serialize() method can 3 parameters as a input, like bellow 
+
+         serialize('json_type', queryset_object, fileds)
+
+
+here , serialize() present in django.core.serializers import serialize
+
+here we are not write a big code for converting "queryset records"  into  "json" type. 
+This single line will do every thing. 
+
+Thats why serializers concept got more popularity in django.
+
+
+
+OUTPUT:
+=======
+After writing this code , if we executed from partner application , then we will get output as,
+[
+   {
+       'model'  :  'Serialize_App.Emp',   'pk'  :  1 , 'fields'  :   {'eno' : 100 , 'ename' : Srinivas, 'esal': 30000 , 'eaddr' : 'Hyd'}  
+   }
+]
+
+
+      Here ,  list  --------->> contains dictionary objects,
+
+              model---->> it describes about appName and modelsName related to that app.
+
+              pk  ----->>>> It tells which one is our Primary key of model.
+
+              fields ------>> It is a dictionary ,which contains our original data.
+
+Steps: -
+======
+
+
+So , here lot of meta data came as output. So i want only required employee fileds data.  I don't want to display this meta data information. Is it possible or not....????
+ ------ > yes  possible , For this i need to do some thing .
+
+
+Steps :
+-------
+After getting the  " json_data"  by using  "serialize()"  then convert this  json_data into Dictionary type by using "loads()" of json module.
+
+           python_data = json.loads( json_data )
+                             ----->> It contains List of Dictionary objects.
+
+Next we will write "for - loop" for getting exact dictionary data.
+
+	for  obj   in   python_data : 
+	            emp_data = obj["fields"]	
+
+here , obj ---->> contains meta data like (models , pk , fields )
+
+            obj['fields'] ---->> will get required data of emp . No meta date comes here.
+
+            emp_data ------>> here each employee data is comming each time. 
+   
+ so we need to add these data to one  empty  list  like   final_list = []   
+
+
+
+Assigns each emp_data into this empty list by using append() of list.
+	final_list . append( emp_data )
+
+Finally our list contains all required data of employees only. no meta data here.This is like Python Dictionary data. 
+
+Now convert this python Dictionary data into JSON  data type . 
+	json_data = json.dumps( final_list )
+
+send this  "json_data"  variable to HttpResponse()
+
+By this way, only required emp data we will send or display to end user or partner application.. 
+
+for Example :-
+
+class EmployeeListView(View) : 
+       def get(self , request ):
+                qs = Employee.objects . all()
+
+                json_data =  serialize( 'json' , qs  )   
+                
+                p_data = json.loads( json_data )
+                
+                final_list  = []
+
+                for obj  in  p_data :
+                        emp_data = obj["fields"]
+                        final_list .append( emp_data )
+               
+                json_data = json.dumps( final_list )
+
+                return HttpResponse( json_data , content_type = 'application/json')
+
+Now check again my code  from partner application or browser then see output, it comes like required data or meta data. lets see ok.
+
+cmd > python test.py   ---> enter
+
+output :   200
+	[ 
+           { 'eno' : 100 , 'ename' : 'Smith' , 'esal' : 10000 , 'eaddr' : 'Hyd' },
+	   { 'eno' : 200 , 'ename' : 'David', 'esal' : 20000 , 'eaddr' : Chennai},
+	   { 'eno' : 300 , 'ename' : Virat, 'esal' : 30000 , 'eaddr' : Mumbai}, 
+        ]
+	
+ Yes , we are getting only required data of employee's. Here we are not getting Meta data of employee. So it is looking good.. means understanding very easy.
+
+Note : If you want only perticular fileds of employee then you should use "fileds" attribute with required names
+
+for example ,  json_data = serialize( 'json' , qs , fields = ['eno' , 'ename', ....] )
+
+
+
+
+Drawback :
+========
+Here we are writing the code for  handling the fields , metadata  information only for getting all records data purpose only. We are not handling the code for "ID" based records.
+
+So for this "ID" based records , we need to write all the above code again . So it is like writing duplicate code multiple times. So No  CODE -- RE--USABILITY concept here.
+
+
+Q) How do you over come  this problem ?
+   ================   ==============
+To over come this problem , we need to write this common code in one Separate class we called as "Mixins" class.
+
+Mixin is a class in Django which acts as parent class to provide functionality to the child class.But not to do in the Parent class.
+
+Mixin class is a direct child class of objects class.
+
+using Mixin class we will get code reusability
+
+Later we importing this Mixins class where ever we want and reducing the duplicate codes writting again and again.
+
+For that , create one "mixins" class under Application Name. write this code again.
+
+Later importing this mixin class wherever we want.
+
+
+For example , Program
+=========        =====
+class EmployeeDetailView(SerializeMixin,View):
+    def get(self,request,id):
+        try:
+            emp = Employee.objects.get(id=id)
+
+        except Employee.DoesNotExist:
+            json_data = json.dumps({'msg' : 'Requested resource not available'})
+            return HttpResponse(json_data,content_type='application/json')
+
+        else:
+            json_meta_data = serialize('json',[emp])
+
+            json_data = self.user_defined_serialize(json_meta_data)
+
+            return HttpResponse(json_data,content_type='application/json')
+
+
+
+
+views.py code:
+============
+
+
+
+from django.views import View
+
+from .models import Employee
+from .forms import EmployeeForm
+from django.http import HttpResponse
+
+import json
+from django.core.serializers import serialize
+
+#  Id based class operation
+
+class EmployeeDetailView(View):
+    def get(self,request,id):
+        try:
+            emp = Employee.objects.get(id=id)
+        except Employee.DoesNotExist:
+            json_data = json.dumps({'msg':'Record not available'})
+            return HttpResponse(json_data, content_type='application/json')
+        else:
+            # dict_data = {
+            #     'eno':emp.eno,
+            #     'ename' : emp.ename,
+            #     'esal' : emp.esal,
+            #     'eaddr': emp.eaddr
+            # }
+            # json_data = json.dumps(dict_data)
+
+
+            json_data = serialize('json',[emp])
+
+            dict_data = json.loads(json_data)
+
+            final_list = []
+
+            for obj in dict_data:
+                emp_data = obj['fields']
+                final_list.append(emp_data)
+
+            json_data = json.dumps(final_list)
+
+            return HttpResponse(json_data, content_type='application/json')
+
+
+
+# Non Id based class operation
+
+class EmployeeListView(View):
+    def get(self,request):
+        emps = Employee.objects.all()
+
+        json_data = serialize('json',emps,fields=['eno','ename'])
+
+        dict_data = json.loads(json_data)
+
+        final_list = []
+
+        for obj in dict_data:
+            emp_data = obj['fields']
+            final_list.append(emp_data)
+
+        json_data = json.dumps(final_list)
+
+        return HttpResponse(json_data,content_type='application/json')
